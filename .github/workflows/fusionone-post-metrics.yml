@@ -44,11 +44,23 @@ jobs:
             // Step 1: Get authentication token from CheckmarxOne
             console.log('Getting CheckmarxOne authentication token...');
             const tokenUrl = `https://${process.env.CXONE_API_HOST}/auth/realms/${process.env.CXONE_TENANT}/protocol/openid-connect/token`;
+            console.log(`Token URL: ${tokenUrl}`);
+
+            // Debug: Log environment variables (without exposing sensitive values)
+            console.log(`CXONE_API_HOST: ${process.env.CXONE_API_HOST}`);
+            console.log(`CXONE_TENANT: ${process.env.CXONE_TENANT}`);
+            console.log(`CXONE_API_KEY present: ${!!process.env.CXONE_API_KEY}`);
 
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('grant_type', 'refresh_token');
             tokenFormData.append('client_id', 'ast_app');
             tokenFormData.append('refresh_token', process.env.CXONE_API_KEY);
+
+            // Debug: Log request parameters (without exposing the actual API key)
+            console.log('Token request parameters:');
+            console.log(`- grant_type: refresh_token`);
+            console.log(`- client_id: ast_app`);
+            console.log(`- refresh_token: ${process.env.CXONE_API_KEY ? '[PRESENT]' : '[MISSING]'}`);
 
             const tokenResponse = await fetch(tokenUrl, {
               method: 'POST',
@@ -60,6 +72,9 @@ jobs:
 
             if (!tokenResponse.ok) {
               const errorText = await tokenResponse.text();
+              console.log(`Token request failed with status: ${tokenResponse.status} ${tokenResponse.statusText}`);
+              console.log(`Error response: ${errorText}`);
+              console.log(`Response headers: ${JSON.stringify([...tokenResponse.headers.entries()])}`);
               core.setFailed(`Failed to get CheckmarxOne token: ${tokenResponse.statusText} - ${errorText}`);
               return;
             }
