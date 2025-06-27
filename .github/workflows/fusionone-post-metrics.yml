@@ -100,7 +100,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: "{{ installation_id }}"
+                installation_id: "73213179"
               })
             });
 
@@ -168,7 +168,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: "{{ installation_id }}"
+                installation_id: "73213179"
               })
             });
 
