@@ -53,13 +53,13 @@ jobs:
 
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('grant_type', 'refresh_token');
-            tokenFormData.append('client_id', 'ast_app');
+            tokenFormData.append('client_id', 'ast-app');
             tokenFormData.append('refresh_token', process.env.CXONE_API_KEY);
 
             // Debug: Log request parameters (without exposing the actual API key)
             console.log('Token request parameters:');
             console.log(`- grant_type: refresh_token`);
-            console.log(`- client_id: ast_app`);
+            console.log(`- client_id: ast-app`);
             console.log(`- refresh_token: ${process.env.CXONE_API_KEY ? '[PRESENT]' : '[MISSING]'}`);
 
             const tokenResponse = await fetch(tokenUrl, {
