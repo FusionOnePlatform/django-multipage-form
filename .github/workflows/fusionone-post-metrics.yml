@@ -36,6 +36,40 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
 
+      # Step to dynamically get the installation ID for the "FusionOne Platform" app
+      - name: Get FusionOne Platform Installation ID
+        id: get_installation_id
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const app_slug = "fusionone-platform";
+            let installationId = "";
+
+            try {
+              const installations = await github.rest.apps.listInstallationsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+
+              const appInstallation = installations.data.find(
+                (i) => i.app_slug === app_slug
+              );
+
+              if (appInstallation) {
+                installationId = appInstallation.id.toString();
+                console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
+              } else {
+                console.log(`'${app_slug}' is not installed on this repository.`);
+              }
+            } catch (error) {
+               console.log(`Could not retrieve app installations for this repository. Error: ${error.message}`);
+            }
+
+            core.setOutput('id', installationId);
+          result-encoding: string
+        env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Post CheckmarxOne metrics to FusionOne
         if: steps.detect-type.outputs.result == 'cxone'
         uses: actions/github-script@v6
@@ -44,37 +78,19 @@ jobs:
             // Step 1: Get authentication token from CheckmarxOne
             console.log('Getting CheckmarxOne authentication token...');
             const tokenUrl = `https://${process.env.CXONE_API_HOST}/auth/realms/${process.env.CXONE_TENANT}/protocol/openid-connect/token`;
-            console.log(`Token URL: ${tokenUrl}`);
-
-            // Debug: Log environment variables (without exposing sensitive values)
-            console.log(`CXONE_API_HOST: ${process.env.CXONE_API_HOST}`);
-            console.log(`CXONE_TENANT: ${process.env.CXONE_TENANT}`);
-            console.log(`CXONE_API_KEY present: ${!!process.env.CXONE_API_KEY}`);
-
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('grant_type', 'refresh_token');
             tokenFormData.append('client_id', 'ast-app');
             tokenFormData.append('refresh_token', process.env.CXONE_API_KEY);
 
-            // Debug: Log request parameters (without exposing the actual API key)
-            console.log('Token request parameters:');
-            console.log(`- grant_type: refresh_token`);
-            console.log(`- client_id: ast-app`);
-            console.log(`- refresh_token: ${process.env.CXONE_API_KEY ? '[PRESENT]' : '[MISSING]'}`);
-
             const tokenResponse = await fetch(tokenUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-              },
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: tokenFormData
             });
 
             if (!tokenResponse.ok) {
               const errorText = await tokenResponse.text();
-              console.log(`Token request failed with status: ${tokenResponse.status} ${tokenResponse.statusText}`);
-              console.log(`Error response: ${errorText}`);
-              console.log(`Response headers: ${JSON.stringify([...tokenResponse.headers.entries()])}`);
               core.setFailed(`Failed to get CheckmarxOne token: ${tokenResponse.statusText} - ${errorText}`);
               return;
             }
@@ -100,7 +116,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: "${{ github.event.installation.id }}"
+                installation_id: "${{ steps.get_installation_id.outputs.id }}"
               })
             });
 
@@ -136,9 +152,7 @@ jobs:
 
             const tokenResponse = await fetch(tokenUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-              },
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: tokenFormData
             });
 
@@ -168,7 +182,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: "${{ github.event.installation.id }}"
+                installation_id: "${{ steps.get_installation_id.outputs.id }}"
               })
             });
 
