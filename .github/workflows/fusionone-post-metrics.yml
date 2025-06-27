@@ -100,7 +100,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: process.env.INSTALLATION_ID || "73213179"
+                installation_id: "${{ github.event.installation.id }}"
               })
             });
 
@@ -113,7 +113,6 @@ jobs:
               console.log(`Response: ${JSON.stringify(responseData)}`);
             }
         env:
-          INSTALLATION_ID: "73213179"
           CXONE_API_HOST: ${{ secrets.CXONE_API_HOST }}
           CXONE_API_KEY: ${{ secrets.CXONE_API_KEY }}
           CXONE_TENANT: ${{ secrets.CXONE_TENANT }}
@@ -169,7 +168,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: process.env.INSTALLATION_ID || "73213179"
+                installation_id: "${{ github.event.installation.id }}"
               })
             });
 
@@ -182,7 +181,6 @@ jobs:
               console.log(`Response: ${JSON.stringify(responseData)}`);
             }
         env:
-          INSTALLATION_ID: "73213179"
           CX_API_HOST: ${{ secrets.CX_API_HOST }}
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
