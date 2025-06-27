@@ -84,13 +84,12 @@ jobs:
             console.log('Successfully obtained CheckmarxOne authentication token');
 
             // Step 2: Post metrics to FusionOne using the token
-            const metricsEndpoint = "https://api-dev.fusiononeplatform.com/api/github-metrics";
+            const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${process.env.FUSIONONE_API_KEY}`,
                 'Content-Type': 'application/json',
                 'X-Checkmarx-Host': process.env.CXONE_API_HOST,
                 'X-Checkmarx-Token': cxToken,
@@ -100,7 +99,8 @@ jobs:
                 repository: `${context.repo.owner}/${context.repo.repo}`,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                release: context.payload.release.tag_name
+                release: context.payload.release.tag_name,
+                installation_id: "{{ installation_id }}"
               })
             });
 
@@ -113,7 +113,6 @@ jobs:
               console.log(`Response: ${JSON.stringify(responseData)}`);
             }
         env:
-          FUSIONONE_API_KEY: ${{ secrets.FUSIONONE_API_KEY }}
           CXONE_API_HOST: ${{ secrets.CXONE_API_HOST }}
           CXONE_API_KEY: ${{ secrets.CXONE_API_KEY }}
           CXONE_TENANT: ${{ secrets.CXONE_TENANT }}
@@ -154,13 +153,12 @@ jobs:
             console.log('Successfully obtained Checkmarx authentication token');
 
             // Step 2: Post metrics to FusionOne using the token
-            const metricsEndpoint = "https://api-dev.fusiononeplatform.com/api/github-metrics";
+            const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${process.env.FUSIONONE_API_KEY}`,
                 'Content-Type': 'application/json',
                 'X-Checkmarx-Host': process.env.CX_API_HOST,
                 'X-Checkmarx-Token': cxToken
@@ -169,7 +167,8 @@ jobs:
                 repository: `${context.repo.owner}/${context.repo.repo}`,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                release: context.payload.release.tag_name
+                release: context.payload.release.tag_name,
+                installation_id: "{{ installation_id }}"
               })
             });
 
@@ -182,7 +181,6 @@ jobs:
               console.log(`Response: ${JSON.stringify(responseData)}`);
             }
         env:
-          FUSIONONE_API_KEY: ${{ secrets.FUSIONONE_API_KEY }}
           CX_API_HOST: ${{ secrets.CX_API_HOST }}
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
