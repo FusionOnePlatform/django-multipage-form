@@ -109,7 +109,8 @@ jobs:
                 'Content-Type': 'application/json',
                 'X-Checkmarx-Host': process.env.CXONE_API_HOST,
                 'X-Checkmarx-Token': process.env.CXONE_API_KEY,
-                'X-Checkmarx-Tenant': process.env.CXONE_TENANT
+                'X-Checkmarx-Tenant': process.env.CXONE_TENANT,
+                'X-Installation-ID': "${{ steps.get_installation_id.outputs.id }}"
               },
               body: JSON.stringify({
                 repository: `${context.repo.owner}/${context.repo.repo}`,
@@ -175,7 +176,8 @@ jobs:
               headers: {
                 'Content-Type': 'application/json',
                 'X-Checkmarx-Host': process.env.CX_API_HOST,
-                'X-Checkmarx-Token': process.env.CX_PASSWORD
+                'X-Checkmarx-Token': process.env.CX_PASSWORD,
+                'X-Installation-ID': "${{ steps.get_installation_id.outputs.id }}"
               },
               body: JSON.stringify({
                 repository: `${context.repo.owner}/${context.repo.repo}`,
