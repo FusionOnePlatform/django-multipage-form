@@ -42,15 +42,26 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            const { createAppAuth } = require("@octokit/auth-app");
             const app_slug = "fusionone-platform";
             let installationId = "";
             try {
+              const appAuth = createAppAuth({
+                appId: ${{ secrets.APP_ID }},
+                privateKey: ${{ secrets.APP_PRIVATE_KEY }},
+              });
+              
+              const auth = await appAuth({ type: "app" });
+              
+              const octokit = new Octokit({ auth: auth.token });
+              
               console.log(`Retrieving installation for repository ${context.repo.owner}/${context.repo.repo}`);
-              // Use the correct API endpoint to get the installation for this repo
-              const installation = await github.rest.apps.getRepoInstallation({
+              
+              const installation = await octokit.apps.getRepoInstallation({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
               });
+              
               installationId = installation.data.id.toString();
               console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
             } catch (error) {
