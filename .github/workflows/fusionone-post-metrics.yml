@@ -50,18 +50,18 @@ jobs:
                 appId: ${{ secrets.APP_ID }},
                 privateKey: ${{ secrets.APP_PRIVATE_KEY }},
               });
-              
+
               const auth = await appAuth({ type: "app" });
-              
+
               const octokit = new Octokit({ auth: auth.token });
-              
+
               console.log(`Retrieving installation for repository ${context.repo.owner}/${context.repo.repo}`);
-              
+
               const installation = await octokit.apps.getRepoInstallation({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
               });
-              
+
               installationId = installation.data.id.toString();
               console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
             } catch (error) {
@@ -116,7 +116,7 @@ jobs:
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
             // Get the installation ID from the previous step
-            const installationId = ${{ steps.get_installation_id.outputs.id }};
+            const installationId = process.env.INSTALLATION_ID;
             console.log(`Using installation ID: ${installationId}`);
 
             const response = await fetch(metricsEndpoint, {
@@ -149,6 +149,7 @@ jobs:
           CXONE_API_HOST: ${{ secrets.CXONE_API_HOST }}
           CXONE_API_KEY: ${{ secrets.CXONE_API_KEY }}
           CXONE_TENANT: ${{ secrets.CXONE_TENANT }}
+          INSTALLATION_ID: ${{ steps.get_installation_id.outputs.id }}
 
       - name: Post Checkmarx metrics to FusionOne
         if: steps.detect-type.outputs.result == 'cx'
@@ -188,7 +189,7 @@ jobs:
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
             // Get the installation ID from the previous step
-            const installationId = ${{ steps.get_installation_id.outputs.id }};
+            const installationId = process.env.INSTALLATION_ID;
             console.log(`Using installation ID: ${installationId}`);
 
             const response = await fetch(metricsEndpoint, {
@@ -221,3 +222,4 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
           CX_CLIENT_SECRET: ${{ secrets.CX_CLIENT_SECRET }}
+          INSTALLATION_ID: ${{ steps.get_installation_id.outputs.id }}
