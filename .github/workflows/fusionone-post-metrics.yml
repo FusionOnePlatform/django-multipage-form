@@ -41,7 +41,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
-          app-id: ${{ secrets.APP_ID }}
+          app-id: 1214448
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       # Step 2: Get the installation ID using the app token
@@ -75,7 +75,7 @@ jobs:
 
             // Step 1: Get authentication token from CheckmarxOne
             console.log('Getting CheckmarxOne authentication token...');
-            const tokenUrl = `https://${process.env.CXONE_API_HOST}/auth/realms/${process.env.CXONE_TENANT}/protocol/openid-connect/token`;
+            const tokenUrl = `https://${{process.env.CXONE_API_HOST}}/auth/realms/${{process.env.CXONE_TENANT}}/protocol/openid-connect/token`;
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('grant_type', 'refresh_token');
             tokenFormData.append('client_id', 'ast-app');
@@ -111,7 +111,7 @@ jobs:
                 'X-Installation-ID': installationId
               },
               body: JSON.stringify({
-                repository: `${context.repo.owner}/${context.repo.repo}`,
+                repository: `${{context.repo.owner}}/${{context.repo.repo}}`,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
@@ -143,7 +143,7 @@ jobs:
 
             // Step 1: Get authentication token from Checkmarx
             console.log('Getting Checkmarx authentication token...');
-            const tokenUrl = `https://${process.env.CX_API_HOST}/cxrestapi/auth/identity/connect/token`;
+            const tokenUrl = `https://${{process.env.CX_API_HOST}}/cxrestapi/auth/identity/connect/token`;
 
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('username', process.env.CX_USER_NAME);
@@ -182,7 +182,7 @@ jobs:
                 'X-Installation-ID': installationId
               },
               body: JSON.stringify({
-                repository: `${context.repo.owner}/${context.repo.repo}`,
+                repository: `${{context.repo.owner}}/${{context.repo.repo}}`,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
