@@ -44,45 +44,21 @@ jobs:
           script: |
             const app_slug = "fusionone-platform";
             let installationId = "";
-
             try {
-              console.log(`Retrieving installations for repository ${context.repo.owner}/${context.repo.repo}`);
-              const installations = await github.rest.apps.listInstallationsForRepo({
+              console.log(`Retrieving installation for repository ${context.repo.owner}/${context.repo.repo}`);
+              // Use the correct API endpoint to get the installation for this repo
+              const installation = await github.rest.apps.getRepoInstallation({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
               });
-
-              console.log(`Found ${installations.data.length} installations for this repository`);
-
-              // Log all installations to help with debugging
-              installations.data.forEach((installation, index) => {
-                console.log(`Installation ${index + 1}: ID=${installation.id}, app_slug=${installation.app_slug}`);
-              });
-
-              const appInstallation = installations.data.find(
-                (i) => i.app_slug === app_slug
-              );
-
-              if (appInstallation) {
-                installationId = appInstallation.id.toString();
-                console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
-              } else {
-                console.log(`'${app_slug}' is not installed on this repository.`);
-
-                // Fallback: use the first installation if available
-                if (installations.data.length > 0) {
-                  installationId = installations.data[0].id.toString();
-                  console.log(`Using first available installation with ID: ${installationId} as fallback`);
-                }
-              }
+              installationId = installation.data.id.toString();
+              console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
             } catch (error) {
-               console.log(`Could not retrieve app installations for this repository. Error: ${error.message}`);
+              console.log(`Could not retrieve app installation for this repository. Error: ${error.message}`);
             }
-
             if (!installationId) {
               console.log(`WARNING: No installation ID found. This will cause issues with the metrics endpoint.`);
             }
-
             console.log(`Setting output 'id' to: ${installationId}`);
             core.setOutput('id', installationId);
           result-encoding: string
