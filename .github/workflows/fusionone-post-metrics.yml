@@ -46,9 +46,17 @@ jobs:
             let installationId = "";
 
             try {
+              console.log(`Retrieving installations for repository ${context.repo.owner}/${context.repo.repo}`);
               const installations = await github.rest.apps.listInstallationsForRepo({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
+              });
+
+              console.log(`Found ${installations.data.length} installations for this repository`);
+
+              // Log all installations to help with debugging
+              installations.data.forEach((installation, index) => {
+                console.log(`Installation ${index + 1}: ID=${installation.id}, app_slug=${installation.app_slug}`);
               });
 
               const appInstallation = installations.data.find(
@@ -60,11 +68,22 @@ jobs:
                 console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
               } else {
                 console.log(`'${app_slug}' is not installed on this repository.`);
+
+                // Fallback: use the first installation if available
+                if (installations.data.length > 0) {
+                  installationId = installations.data[0].id.toString();
+                  console.log(`Using first available installation with ID: ${installationId} as fallback`);
+                }
               }
             } catch (error) {
                console.log(`Could not retrieve app installations for this repository. Error: ${error.message}`);
             }
 
+            if (!installationId) {
+              console.log(`WARNING: No installation ID found. This will cause issues with the metrics endpoint.`);
+            }
+
+            console.log(`Setting output 'id' to: ${installationId}`);
             core.setOutput('id', installationId);
           result-encoding: string
         env:
@@ -103,6 +122,10 @@ jobs:
             const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
+            // Get the installation ID from the previous step
+            const installationId = "${{ steps.get_installation_id.outputs.id }}";
+            console.log(`Using installation ID: ${installationId}`);
+
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
@@ -110,14 +133,14 @@ jobs:
                 'X-Checkmarx-Host': process.env.CXONE_API_HOST,
                 'X-Checkmarx-Token': process.env.CXONE_API_KEY,
                 'X-Checkmarx-Tenant': process.env.CXONE_TENANT,
-                'X-Installation-ID': "${{ steps.get_installation_id.outputs.id }}"
+                'X-Installation-ID': installationId
               },
               body: JSON.stringify({
                 repository: `${context.repo.owner}/${context.repo.repo}`,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: "${{ steps.get_installation_id.outputs.id }}"
+                installation_id: installationId
               })
             });
 
@@ -171,20 +194,24 @@ jobs:
             const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
+            // Get the installation ID from the previous step
+            const installationId = "${{ steps.get_installation_id.outputs.id }}";
+            console.log(`Using installation ID: ${installationId}`);
+
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'X-Checkmarx-Host': process.env.CX_API_HOST,
                 'X-Checkmarx-Token': process.env.CX_PASSWORD,
-                'X-Installation-ID': "${{ steps.get_installation_id.outputs.id }}"
+                'X-Installation-ID': installationId
               },
               body: JSON.stringify({
                 repository: `${context.repo.owner}/${context.repo.repo}`,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 release: context.payload.release.tag_name,
-                installation_id: "${{ steps.get_installation_id.outputs.id }}"
+                installation_id: installationId
               })
             });
 
