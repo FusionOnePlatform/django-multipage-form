@@ -36,57 +36,43 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
 
-      # Step to dynamically get the installation ID for the "FusionOne Platform" app
+      # Step 1: Generate a token for the GitHub App
+      - name: Generate GitHub App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      # Step 2: Get the installation ID using the app token
       - name: Get FusionOne Platform Installation ID
         id: get_installation_id
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { createAppAuth } = require("@octokit/auth-app");
-            const app_slug = "fusionone-platform";
-            let installationId = "";
-            try {
-              const appAuth = createAppAuth({
-                appId: ${{ secrets.APP_ID }},
-                privateKey: ${{ secrets.APP_PRIVATE_KEY }},
-              });
-
-              const auth = await appAuth({ type: "app" });
-
-              const octokit = new Octokit({ auth: auth.token });
-
-              console.log(`Retrieving installation for repository ${context.repo.owner}/${context.repo.repo}`);
-
-              const installation = await octokit.apps.getRepoInstallation({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-              });
-
-              installationId = installation.data.id.toString();
-              console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
-            } catch (error) {
-              console.log(`Could not retrieve app installation for this repository. Error: ${error.message}`);
-            }
-            if (!installationId) {
-              console.log(`WARNING: No installation ID found. This will cause issues with the metrics endpoint.`);
-            }
-            console.log(`Setting output 'id' to: ${installationId}`);
-            core.setOutput('id', installationId);
-          result-encoding: string
-        env:
-           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fail if installation ID is empty
-        if: steps.get_installation_id.outputs.id == ''
         run: |
-          echo "Error: installation_id is empty. Workflow cannot continue."
-          exit 1
+          INSTALLATION_JSON=$(curl -s -X GET \
+            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/installation)
+          
+          INSTALLATION_ID=$(echo $INSTALLATION_JSON | jq -r '.id')
+          
+          if [[ -z "$INSTALLATION_ID" || "$INSTALLATION_ID" == "null" ]]; then
+            echo "::error::Could not find installation ID for this repository. API Response: $(echo $INSTALLATION_JSON | jq -r '.message')"
+            echo "id=" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "Found installation ID: ${INSTALLATION_ID}"
+            echo "id=${INSTALLATION_ID}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Post CheckmarxOne metrics to FusionOne
         if: steps.detect-type.outputs.result == 'cxone'
         uses: actions/github-script@v6
         with:
           script: |
+            // Get the installation ID from the previous step
+            const installationId = '${{ steps.get_installation_id.outputs.id }}';
+            console.log(`Using installation ID: ${installationId}`);
+
             // Step 1: Get authentication token from CheckmarxOne
             console.log('Getting CheckmarxOne authentication token...');
             const tokenUrl = `https://${process.env.CXONE_API_HOST}/auth/realms/${process.env.CXONE_TENANT}/protocol/openid-connect/token`;
@@ -114,10 +100,6 @@ jobs:
             // Step 2: Post metrics to FusionOne using the token
             const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
             console.log(`Posting metrics to ${metricsEndpoint}`);
-
-            // Get the installation ID from the previous step
-            const installationId = process.env.INSTALLATION_ID;
-            console.log(`Using installation ID: ${installationId}`);
 
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
@@ -149,13 +131,16 @@ jobs:
           CXONE_API_HOST: ${{ secrets.CXONE_API_HOST }}
           CXONE_API_KEY: ${{ secrets.CXONE_API_KEY }}
           CXONE_TENANT: ${{ secrets.CXONE_TENANT }}
-          INSTALLATION_ID: ${{ steps.get_installation_id.outputs.id }}
 
       - name: Post Checkmarx metrics to FusionOne
         if: steps.detect-type.outputs.result == 'cx'
         uses: actions/github-script@v6
         with:
           script: |
+            // Get the installation ID from the previous step
+            const installationId = '${{ steps.get_installation_id.outputs.id }}';
+            console.log(`Using installation ID: ${installationId}`);
+
             // Step 1: Get authentication token from Checkmarx
             console.log('Getting Checkmarx authentication token...');
             const tokenUrl = `https://${process.env.CX_API_HOST}/cxrestapi/auth/identity/connect/token`;
@@ -188,10 +173,6 @@ jobs:
             const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
-            // Get the installation ID from the previous step
-            const installationId = process.env.INSTALLATION_ID;
-            console.log(`Using installation ID: ${installationId}`);
-
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
@@ -222,4 +203,3 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
           CX_CLIENT_SECRET: ${{ secrets.CX_CLIENT_SECRET }}
-          INSTALLATION_ID: ${{ steps.get_installation_id.outputs.id }}
