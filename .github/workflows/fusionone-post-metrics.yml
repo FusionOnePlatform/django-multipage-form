@@ -105,7 +105,7 @@ jobs:
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
             // Get the installation ID from the previous step
-            const installationId = "${{ steps.get_installation_id.outputs.id }}";
+            const installationId = ${{ steps.get_installation_id.outputs.id }};
             console.log(`Using installation ID: ${installationId}`);
 
             const response = await fetch(metricsEndpoint, {
@@ -177,7 +177,7 @@ jobs:
             console.log(`Posting metrics to ${metricsEndpoint}`);
 
             // Get the installation ID from the previous step
-            const installationId = "${{ steps.get_installation_id.outputs.id }}";
+            const installationId = ${{ steps.get_installation_id.outputs.id }};
             console.log(`Using installation ID: ${installationId}`);
 
             const response = await fetch(metricsEndpoint, {
