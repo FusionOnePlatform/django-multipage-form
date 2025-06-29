@@ -52,9 +52,9 @@ jobs:
             -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/installation)
-          
+
           INSTALLATION_ID=$(echo $INSTALLATION_JSON | jq -r '.id')
-          
+
           if [[ -z "$INSTALLATION_ID" || "$INSTALLATION_ID" == "null" ]]; then
             echo "::error::Could not find installation ID for this repository. API Response: $(echo $INSTALLATION_JSON | jq -r '.message')"
             echo "id=" >> $GITHUB_OUTPUT
