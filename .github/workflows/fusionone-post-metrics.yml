@@ -65,12 +65,6 @@ jobs:
         env:
            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Fail if installation ID is empty
-        if: steps.get_installation_id.outputs.id == ''
-        run: |
-          echo "Error: installation_id is empty. Workflow cannot continue."
-          exit 1
-
       - name: Post CheckmarxOne metrics to FusionOne
         if: steps.detect-type.outputs.result == 'cxone'
         uses: actions/github-script@v6
@@ -210,3 +204,4 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
           CX_CLIENT_SECRET: ${{ secrets.CX_CLIENT_SECRET }}
+
