@@ -29,7 +29,14 @@ jobs:
 
       - name: Decode Private Key
         id: decode_key
-        run: echo "private_key_decoded=$(echo '${{ secrets.APP_PRIVATE_KEY_B64 }}' | base64 -d)" >> $GITHUB_OUTPUT
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const b64_key = process.env.B64_KEY;
+            const decoded_key = Buffer.from(b64_key, 'base64').toString('utf-8');
+            core.setOutput('private_key_decoded', decoded_key);
+        env:
+          B64_KEY: ${{ secrets.APP_PRIVATE_KEY_B64 }}
 
       - name: Generate GitHub App Token
         id: app-token
