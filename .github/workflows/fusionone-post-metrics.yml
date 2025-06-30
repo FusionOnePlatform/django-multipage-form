@@ -13,11 +13,20 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
+            // Check if CheckmarxOne secrets are available
             const hasCxOneSecrets = !!process.env.CXONE_API_HOST && !!process.env.CXONE_API_KEY && !!process.env.CXONE_TENANT;
             const hasCxSecrets = !!process.env.CX_API_HOST && !!process.env.CX_USER_NAME && !!process.env.CX_PASSWORD;
-            if (hasCxOneSecrets) { return 'cxone'; }
-            if (hasCxSecrets) { return 'cx'; }
-            core.setFailed('Missing required Checkmarx credentials');
+
+            if (hasCxOneSecrets) {
+              console.log('Using CheckmarxOne authentication');
+              return 'cxone';
+            } else if (hasCxSecrets) {
+              console.log('Using Checkmarx authentication');
+              return 'cx';
+            } else {
+              core.setFailed('Missing required Checkmarx credentials');
+              return 'none';
+            }
           result-encoding: string
         env:
           CXONE_API_HOST: ${{ secrets.CXONE_API_HOST }}
@@ -27,50 +36,72 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
 
-      - name: Generate GitHub App Token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
+      # Step to dynamically get the installation ID for the "FusionOne Platform" app
       - name: Get FusionOne Platform Installation ID
         id: get_installation_id
-        run: |
-          INSTALLATION_JSON=$(curl -s -X GET \
-            -H "Authorization: Bearer ${{ steps.app-token.outputs.token }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/installation)
-          INSTALLATION_ID=$(echo $INSTALLATION_JSON | jq -r '.id')
-          if [[ -z "$INSTALLATION_ID" || "$INSTALLATION_ID" == "null" ]]; then
-            echo "::error::Could not find installation ID. Response: $(echo $INSTALLATION_JSON | jq -r '.message')"
-            exit 1
-          fi
-          echo "id=${INSTALLATION_ID}" >> $GITHUB_OUTPUT
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const app_slug = "fusionone-platform";
+            let installationId = "";
+            try {
+              console.log(`Retrieving installation for repository ${context.repo.owner}/${context.repo.repo}`);
+              // Use the correct API endpoint to get the installation for this repo
+              const installation = await github.rest.apps.getRepoInstallation({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+              });
+              installationId = installation.data.id.toString();
+              console.log(`Found installation for '${app_slug}' with ID: ${installationId}`);
+            } catch (error) {
+              console.log(`Could not retrieve app installation for this repository. Error: ${error.message}`);
+            }
+            if (!installationId) {
+              console.log(`WARNING: No installation ID found. This will cause issues with the metrics endpoint.`);
+            }
+            console.log(`Setting output 'id' to: ${installationId}`);
+            core.setOutput('id', installationId);
+          result-encoding: string
+        env:
+           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Post CheckmarxOne metrics to FusionOne
         if: steps.detect-type.outputs.result == 'cxone'
         uses: actions/github-script@v6
         with:
           script: |
-            const installationId = '${{ steps.get_installation_id.outputs.id }}';
-            console.log('Getting CheckmarxOne auth token...');
-            const tokenUrl = 'https://' + process.env.CXONE_API_HOST + '/auth/realms/' + process.env.CXONE_TENANT + '/protocol/openid-connect/token';
+            // Step 1: Get authentication token from CheckmarxOne
+            console.log('Getting CheckmarxOne authentication token...');
+            const tokenUrl = `https://${process.env.CXONE_API_HOST}/auth/realms/${process.env.CXONE_TENANT}/protocol/openid-connect/token`;
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('grant_type', 'refresh_token');
             tokenFormData.append('client_id', 'ast-app');
             tokenFormData.append('refresh_token', process.env.CXONE_API_KEY);
 
-            const tokenResponse = await fetch(tokenUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: tokenFormData });
+            const tokenResponse = await fetch(tokenUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: tokenFormData
+            });
+
             if (!tokenResponse.ok) {
               const errorText = await tokenResponse.text();
-              core.setFailed('Failed to get CxOne token: ' + tokenResponse.statusText + ' - ' + errorText);
+              core.setFailed(`Failed to get CheckmarxOne token: ${tokenResponse.statusText} - ${errorText}`);
               return;
             }
-            const tokenData = await tokenResponse.json();
 
-            console.log('Posting metrics to FusionOne...');
+            const tokenData = await tokenResponse.json();
+            const cxToken = tokenData.access_token;
+            console.log('Successfully obtained CheckmarxOne authentication token');
+
+            // Step 2: Post metrics to FusionOne using the token
             const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
+            console.log(`Posting metrics to ${metricsEndpoint}`);
+
+            // Get the installation ID from the previous step
+            const installationId = "${{ steps.get_installation_id.outputs.id }}";
+            console.log(`Using installation ID: ${installationId}`);
+
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
@@ -80,14 +111,23 @@ jobs:
                 'X-Checkmarx-Tenant': process.env.CXONE_TENANT,
                 'X-Installation-ID': installationId
               },
-              body: JSON.stringify({ repository: `${{github.repository}}`, release: context.payload.release.tag_name, installation_id: installationId })
+              body: JSON.stringify({
+                repository: `${context.repo.owner}/${context.repo.repo}`,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release: context.payload.release.tag_name,
+                installation_id: installationId
+              })
             });
+
             if (!response.ok) {
               const errorText = await response.text();
-              core.setFailed('Failed to post metrics: ' + response.statusText + ' - ' + errorText);
-              return;
+              core.setFailed(`Failed to post metrics: ${response.statusText} - ${errorText}`);
+            } else {
+              console.log('Successfully posted metrics to FusionOne');
+              const responseData = await response.json();
+              console.log(`Response: ${JSON.stringify(responseData)}`);
             }
-            console.log('Successfully posted metrics.');
         env:
           CXONE_API_HOST: ${{ secrets.CXONE_API_HOST }}
           CXONE_API_KEY: ${{ secrets.CXONE_API_KEY }}
@@ -98,9 +138,10 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const installationId = '${{ steps.get_installation_id.outputs.id }}';
-            console.log('Getting Checkmarx auth token...');
-            const tokenUrl = 'https://' + process.env.CX_API_HOST + '/cxrestapi/auth/identity/connect/token';
+            // Step 1: Get authentication token from Checkmarx
+            console.log('Getting Checkmarx authentication token...');
+            const tokenUrl = `https://${process.env.CX_API_HOST}/cxrestapi/auth/identity/connect/token`;
+
             const tokenFormData = new URLSearchParams();
             tokenFormData.append('username', process.env.CX_USER_NAME);
             tokenFormData.append('password', process.env.CX_PASSWORD);
@@ -109,35 +150,57 @@ jobs:
             tokenFormData.append('client_id', 'resource_owner_client');
             tokenFormData.append('client_secret', process.env.CX_CLIENT_SECRET || '014DF517-39D1-4453-B7B3-9930C563627C');
 
-            const tokenResponse = await fetch(tokenUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: tokenFormData });
+            const tokenResponse = await fetch(tokenUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: tokenFormData
+            });
+
             if (!tokenResponse.ok) {
               const errorText = await tokenResponse.text();
-              core.setFailed('Failed to get Checkmarx token: ' + tokenResponse.statusText + ' - ' + errorText);
+              core.setFailed(`Failed to get Checkmarx token: ${tokenResponse.statusText} - ${errorText}`);
               return;
             }
-            const tokenData = await tokenResponse.json();
 
-            console.log('Posting metrics to FusionOne...');
+            const tokenData = await tokenResponse.json();
+            const cxToken = tokenData.access_token;
+            console.log('Successfully obtained Checkmarx authentication token');
+
+            // Step 2: Post metrics to FusionOne using the token
             const metricsEndpoint = "https://fusionone-github-app-840596493445.us-central1.run.app/metrics";
+            console.log(`Posting metrics to ${metricsEndpoint}`);
+
+            // Get the installation ID from the previous step
+            const installationId = "${{ steps.get_installation_id.outputs.id }}";
+            console.log(`Using installation ID: ${installationId}`);
+
             const response = await fetch(metricsEndpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'X-Checkmarx-Host': process.env.CX_API_HOST,
-                'X-Checkmarx-Token': tokenData.access_token,
+                'X-Checkmarx-Token': process.env.CX_PASSWORD,
                 'X-Installation-ID': installationId
               },
-              body: JSON.stringify({ repository: `${{github.repository}}`, release: context.payload.release.tag_name, installation_id: installationId })
+              body: JSON.stringify({
+                repository: `${context.repo.owner}/${context.repo.repo}`,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release: context.payload.release.tag_name,
+                installation_id: installationId
+              })
             });
+
             if (!response.ok) {
               const errorText = await response.text();
-              core.setFailed('Failed to post metrics: ' + response.statusText + ' - ' + errorText);
-              return;
+              core.setFailed(`Failed to post metrics: ${response.statusText} - ${errorText}`);
+            } else {
+              console.log('Successfully posted metrics to FusionOne');
+              const responseData = await response.json();
+              console.log(`Response: ${JSON.stringify(responseData)}`);
             }
-            console.log('Successfully posted metrics.');
         env:
+          CX_API_HOST: ${{ secrets.CX_API_HOST }}
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
           CX_CLIENT_SECRET: ${{ secrets.CX_CLIENT_SECRET }}
-          CX_API_HOST: ${{ secrets.CX_API_HOST }}
-
