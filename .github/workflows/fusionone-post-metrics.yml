@@ -80,7 +80,7 @@ jobs:
                 'X-Checkmarx-Tenant': process.env.CXONE_TENANT,
                 'X-Installation-ID': installationId
               },
-              body: JSON.stringify({ repository: `${{context.repo.owner}}/${{context.repo.repo}}`, release: context.payload.release.tag_name, installation_id: installationId })
+              body: JSON.stringify({ repository: `${{github.repository}}`, release: context.payload.release.tag_name, installation_id: installationId })
             });
             if (!response.ok) {
               const errorText = await response.text();
@@ -127,7 +127,7 @@ jobs:
                 'X-Checkmarx-Token': tokenData.access_token,
                 'X-Installation-ID': installationId
               },
-              body: JSON.stringify({ repository: `${{context.repo.owner}}/${{context.repo.repo}}`, release: context.payload.release.tag_name, installation_id: installationId })
+              body: JSON.stringify({ repository: `${{github.repository}}`, release: context.payload.release.tag_name, installation_id: installationId })
             });
             if (!response.ok) {
               const errorText = await response.text();
