@@ -27,23 +27,12 @@ jobs:
           CX_USER_NAME: ${{ secrets.CX_USER_NAME }}
           CX_PASSWORD: ${{ secrets.CX_PASSWORD }}
 
-      - name: Decode Private Key
-        id: decode_key
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const b64_key = process.env.B64_KEY;
-            const decoded_key = Buffer.from(b64_key, 'base64').toString('utf-8');
-            core.setOutput('private_key_decoded', decoded_key);
-        env:
-          B64_KEY: ${{ secrets.APP_PRIVATE_KEY_B64 }}
-
       - name: Generate GitHub App Token
         id: app-token
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.APP_ID }}
-          private-key: ${{ steps.decode_key.outputs.private_key_decoded }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Get FusionOne Platform Installation ID
         id: get_installation_id
